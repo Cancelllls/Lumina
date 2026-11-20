@@ -1,0 +1,2 @@
+-keep class com.cancellls.lumina.data.db.** { *; }
+-dontwarn org.json.**

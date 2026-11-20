@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Back tilted frosted card -->
+    <path
+        android:pathData="M34,26 L74,26 A12,12 0 0 1 86,38 L86,70 A12,12 0 0 1 74,82 L34,82 A12,12 0 0 1 22,70 L22,38 A12,12 0 0 1 34,26 Z"
+        android:strokeColor="#4DFFFFFF"
+        android:strokeWidth="1.2">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:endX="86"
+                android:endY="82"
+                android:startX="22"
+                android:startY="26"
+                android:type="linear">
+                <item android:color="#52FFFFFF" android:offset="0" />
+                <item android:color="#1AFFFFFF" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Luminous inner ring -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M54,54m-17,0a17,17 0,1 1,34 0a17,17 0,1 1,-34 0"
+        android:strokeColor="#CC5EEAD4"
+        android:strokeWidth="2.8" />
+
+    <!-- Crisp luminous checkmark -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M45.5,54.5 L51.5,60.5 L63.5,47.5"
+        android:strokeColor="#FFF8FAFC"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:strokeWidth="4.2" />
+</vector>
