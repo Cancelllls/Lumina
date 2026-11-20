@@ -27,10 +27,12 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.CalendarMonth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.OutlinedFlag
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Snooze
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -97,7 +99,9 @@ fun ReminderEditorSheet(
         subtasks: List<SubtaskItem>
     ) -> Unit,
     onDelete: (Long) -> Unit,
-    onSnooze: (Long, Int) -> Unit
+    onSnooze: (Long, Int) -> Unit,
+    onDuplicate: (ReminderItem) -> Unit,
+    onShare: (ReminderItem) -> Unit
 ) {
     val colors = LocalLuminaColors.current
     val existing = modal.existing
@@ -277,10 +281,10 @@ fun ReminderEditorSheet(
                 }
             }
 
-            // Quick Snooze for existing reminder
-            if (existing != null && !existing.isCompleted) {
+            // Quick Actions & Snooze for existing reminder
+            if (existing != null) {
                 Text(
-                    text = "Quick Snooze",
+                    text = if (existing.isCompleted) "Quick Actions" else "Snooze & Actions",
                     style = MaterialTheme.typography.labelLarge,
                     color = colors.textSecondary
                 )
@@ -288,14 +292,28 @@ fun ReminderEditorSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(15 to "+15m", 60 to "+1h", 180 to "+3h").forEach { (mins, label) ->
-                        GlassChip(
-                            label = label,
-                            icon = Icons.Rounded.Snooze,
-                            tint = colors.accentSecondary,
-                            onClick = { onSnooze(existing.id, mins) }
-                        )
+                    if (!existing.isCompleted) {
+                        listOf(15 to "+15m", 60 to "+1h", 180 to "+3h").forEach { (mins, label) ->
+                            GlassChip(
+                                label = label,
+                                icon = Icons.Rounded.Snooze,
+                                tint = colors.accentSecondary,
+                                onClick = { onSnooze(existing.id, mins) }
+                            )
+                        }
                     }
+                    GlassChip(
+                        label = "Duplicate",
+                        icon = Icons.Rounded.ContentCopy,
+                        tint = colors.textSecondary,
+                        onClick = { onDuplicate(existing) }
+                    )
+                    GlassChip(
+                        label = "Share",
+                        icon = Icons.Rounded.Share,
+                        tint = colors.textSecondary,
+                        onClick = { onShare(existing) }
+                    )
                 }
             }
 

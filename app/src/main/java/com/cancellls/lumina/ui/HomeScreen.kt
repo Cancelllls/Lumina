@@ -1,6 +1,12 @@
 package com.cancellls.lumina.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,6 +25,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -42,6 +49,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +59,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -60,23 +73,31 @@ import com.cancellls.lumina.domain.ReminderItem
 import com.cancellls.lumina.domain.ReminderListItem
 import com.cancellls.lumina.domain.SmartListFilter
 import com.cancellls.lumina.domain.SmartListType
+import com.cancellls.lumina.ui.glass.BottomFadeBlur
+import com.cancellls.lumina.ui.glass.GlassActionPill
 import com.cancellls.lumina.ui.glass.GlassCard
 import com.cancellls.lumina.ui.glass.GlassChip
 import com.cancellls.lumina.ui.glass.GlassChromeBar
 import com.cancellls.lumina.ui.glass.GlassCompletionRing
-import com.cancellls.lumina.ui.glass.GlassOrbButton
 import com.cancellls.lumina.ui.glass.ListIconCatalog
+import com.cancellls.lumina.ui.glass.LuminaGlassMetrics
 import com.cancellls.lumina.ui.glass.TopFadeBlur
+import com.cancellls.lumina.ui.haptics.LuminaHaptic
+import com.cancellls.lumina.ui.haptics.rememberLuminaHaptics
 import com.cancellls.lumina.ui.theme.LocalLuminaColors
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.glass.hazeGlassContainer
 import dev.chrisbanes.haze.hazeSource
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 @Composable
 fun HomeScreen(
     uiState: MainUiState,
     meshHazeState: HazeState,
     chromeHazeState: HazeState,
+    nestedScrollConnection: NestedScrollConnection,
     showPermissionBanner: Boolean,
     onGrantPermissionsClick: () -> Unit,
     onDismissPermissionBanner: () -> Unit,
@@ -91,13 +112,45 @@ fun HomeScreen(
     onToggleComplete: (Long) -> Unit,
     onToggleFlag: (Long) -> Unit,
     onToggleSubtask: (Long) -> Unit,
+    onSnooze: (Long, Int) -> Unit,
+    onDuplicate: (ReminderItem) -> Unit,
+    onShare: (ReminderItem) -> Unit,
     onDeleteReminder: (Long) -> Unit,
     onOpenReminder: (ReminderItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalLuminaColors.current
+    val haptics = rememberLuminaHaptics()
+    val listState = rememberLazyListState()
     val listById = remember(uiState.lists) { uiState.lists.associateBy { it.id } }
     val listNameById = remember(uiState.lists) { uiState.lists.associate { it.id to it.name } }
+
+    val showFloatingTitle by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 72
+        }
+    }
+    val largeHeaderAlpha by animateFloatAsState(
+        targetValue = if (showFloatingTitle) 0f else 1f,
+        label = "large_header_alpha"
+    )
+
+    val now = System.currentTimeMillis()
+    val zone = ZoneId.systemDefault()
+    val todayDate = LocalDate.now(zone)
+
+    val completedTodayCount = remember(uiState.allReminders, todayDate) {
+        uiState.allReminders.count { item ->
+            item.isCompleted && item.completedAtMillis?.let {
+                Instant.ofEpochMilli(it).atZone(zone).toLocalDate() == todayDate
+            } == true
+        }
+    }
+    val overdueCount = remember(uiState.allReminders, now) {
+        uiState.allReminders.count { SmartListFilter.isOverdue(it, now) }
+    }
+    val todayRemainingCount = uiState.smartCounts.today
+    val todayTotal = completedTodayCount + todayRemainingCount
 
     val searchResults = remember(uiState.allReminders, uiState.searchQuery, listNameById) {
         if (uiState.searchQuery.isBlank()) {
@@ -109,12 +162,14 @@ fun HomeScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(nestedScrollConnection)
                 .hazeSource(state = chromeHazeState),
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
+                start = LuminaGlassMetrics.PageGutter,
+                end = LuminaGlassMetrics.PageGutter,
                 top = 12.dp,
                 bottom = 148.dp
             ),
@@ -125,10 +180,14 @@ fun HomeScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .statusBarsPadding()
-                        .padding(top = 2.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                        .padding(top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(modifier = Modifier.padding(end = 104.dp)) {
+                    Column(
+                        modifier = Modifier
+                            .padding(end = 108.dp)
+                            .graphicsLayer { alpha = largeHeaderAlpha }
+                    ) {
                         Text(
                             text = "Lumina",
                             style = MaterialTheme.typography.headlineLarge,
@@ -237,6 +296,9 @@ fun HomeScreen(
                             onToggleComplete = { onToggleComplete(item.id) },
                             onToggleFlag = { onToggleFlag(item.id) },
                             onToggleSubtask = onToggleSubtask,
+                            onSnooze = { mins -> onSnooze(item.id, mins) },
+                            onDuplicate = { onDuplicate(item) },
+                            onShare = { onShare(item) },
                             onDelete = { onDeleteReminder(item.id) },
                             onClick = { onOpenReminder(item) }
                         )
@@ -305,7 +367,94 @@ fun HomeScreen(
                 }
             }
 
-            // 2x2 Bento Glass Smart Grid
+            // Today Focus Progress Hero Strip
+            if (todayTotal > 0 || overdueCount > 0) {
+                item(key = "today_progress") {
+                    val fraction = if (todayTotal == 0) 1f else completedTodayCount.toFloat() / todayTotal
+                    val animatedSweep by animateFloatAsState(
+                        targetValue = fraction.coerceIn(0f, 1f),
+                        animationSpec = spring(stiffness = Spring.StiffnessLow),
+                        label = "today_ring_sweep"
+                    )
+                    GlassCard(
+                        hazeState = meshHazeState,
+                        shape = RoundedCornerShape(22.dp),
+                        onClick = {
+                            haptics.play(LuminaHaptic.Select)
+                            onOpenSmartList(SmartListType.TODAY)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier.size(44.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val trackColor = colors.textTertiary.copy(alpha = 0.25f)
+                                val arcColor = if (fraction >= 1f) colors.success else colors.accent
+                                Canvas(modifier = Modifier.fillMaxSize()) {
+                                    drawArc(
+                                        color = trackColor,
+                                        startAngle = -90f,
+                                        sweepAngle = 360f,
+                                        useCenter = false,
+                                        style = Stroke(width = 4.5.dp.toPx(), cap = StrokeCap.Round)
+                                    )
+                                    drawArc(
+                                        color = arcColor,
+                                        startAngle = -90f,
+                                        sweepAngle = 360f * animatedSweep,
+                                        useCenter = false,
+                                        style = Stroke(width = 4.5.dp.toPx(), cap = StrokeCap.Round)
+                                    )
+                                }
+                                Text(
+                                    text = "${(animatedSweep * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        fontFeatureSettings = "tnum"
+                                    ),
+                                    color = colors.textPrimary
+                                )
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (todayRemainingCount == 0 && completedTodayCount > 0) {
+                                        "Today complete"
+                                    } else {
+                                        "Today's focus"
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = "$completedTodayCount of $todayTotal completed",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = colors.textSecondary
+                                )
+                            }
+
+                            if (overdueCount > 0) {
+                                GlassChip(
+                                    label = "$overdueCount overdue",
+                                    tint = colors.danger,
+                                    selected = true
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2x2 Monochrome Bento Glass Smart Grid
             item(key = "bento_row_1") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -315,18 +464,24 @@ fun HomeScreen(
                         title = "Today",
                         count = uiState.smartCounts.today,
                         icon = Icons.Rounded.Today,
-                        accentColor = Color(0xFF38BDF8),
+                        medallionColor = Color(0xFF38BDF8),
                         hazeState = meshHazeState,
-                        onClick = { onOpenSmartList(SmartListType.TODAY) },
+                        onClick = {
+                            haptics.play(LuminaHaptic.Select)
+                            onOpenSmartList(SmartListType.TODAY)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     SmartBentoTile(
                         title = "Scheduled",
                         count = uiState.smartCounts.scheduled,
                         icon = Icons.Rounded.CalendarMonth,
-                        accentColor = Color(0xFFFA2D48),
+                        medallionColor = Color(0xFFFA2D48),
                         hazeState = meshHazeState,
-                        onClick = { onOpenSmartList(SmartListType.SCHEDULED) },
+                        onClick = {
+                            haptics.play(LuminaHaptic.Select)
+                            onOpenSmartList(SmartListType.SCHEDULED)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -341,18 +496,24 @@ fun HomeScreen(
                         title = "Flagged",
                         count = uiState.smartCounts.flagged,
                         icon = Icons.Rounded.Flag,
-                        accentColor = Color(0xFFFF9F0A),
+                        medallionColor = Color(0xFFFF9F0A),
                         hazeState = meshHazeState,
-                        onClick = { onOpenSmartList(SmartListType.FLAGGED) },
+                        onClick = {
+                            haptics.play(LuminaHaptic.Select)
+                            onOpenSmartList(SmartListType.FLAGGED)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                     SmartBentoTile(
                         title = "All",
                         count = uiState.smartCounts.all,
                         icon = Icons.Rounded.Inbox,
-                        accentColor = colors.accent,
+                        medallionColor = colors.accent,
                         hazeState = meshHazeState,
-                        onClick = { onOpenSmartList(SmartListType.ALL) },
+                        onClick = {
+                            haptics.play(LuminaHaptic.Select)
+                            onOpenSmartList(SmartListType.ALL)
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -363,7 +524,10 @@ fun HomeScreen(
                 GlassCard(
                     hazeState = meshHazeState,
                     shape = RoundedCornerShape(20.dp),
-                    onClick = { onOpenSmartList(SmartListType.COMPLETED) },
+                    onClick = {
+                        haptics.play(LuminaHaptic.Select)
+                        onOpenSmartList(SmartListType.COMPLETED)
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Row(
@@ -404,7 +568,7 @@ fun HomeScreen(
                 }
             }
 
-            // Up Next Glass Preview Card
+            // Up Next Glass Card
             if (uiState.upNextReminders.isNotEmpty()) {
                 item(key = "up_next_card") {
                     GlassCard(
@@ -433,7 +597,10 @@ fun HomeScreen(
                                     color = colors.accent,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable { onOpenSmartList(SmartListType.TODAY) }
+                                        .clickable {
+                                            haptics.play(LuminaHaptic.Select)
+                                            onOpenSmartList(SmartListType.TODAY)
+                                        }
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 )
                             }
@@ -543,7 +710,10 @@ fun HomeScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(16.dp))
-                                        .clickable { onOpenCustomList(list.id) }
+                                        .clickable {
+                                            haptics.play(LuminaHaptic.Select)
+                                            onOpenCustomList(list.id)
+                                        }
                                         .padding(horizontal = 6.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
@@ -627,33 +797,78 @@ fun HomeScreen(
             }
         }
 
-        // BitChord Progressive Apple Scroll-Edge Blur
+        // BitChord Progressive Scroll-Edge Blurs
         TopFadeBlur(
             hazeState = chromeHazeState,
             modifier = Modifier.align(Alignment.TopCenter)
         )
+        BottomFadeBlur(
+            hazeState = chromeHazeState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
 
-        // Floating Circular Liquid Glass Controls over TopFadeBlur
-        Row(
+        // Floating Scroll-Reactive Title Pill + Grouped 44dp Action Pill
+        Box(
             modifier = Modifier
-                .align(Alignment.TopEnd)
+                .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 14.dp)
-                .hazeGlassContainer(mergeDistance = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = LuminaGlassMetrics.PageGutter, vertical = 10.dp)
+                .hazeGlassContainer(mergeDistance = 10.dp)
+                .align(Alignment.TopCenter)
         ) {
-            GlassOrbButton(
-                icon = if (uiState.isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
-                contentDescription = if (uiState.isSearchActive) "Close search" else "Search reminders",
+            androidx.compose.animation.AnimatedVisibility(
+                visible = showFloatingTitle,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.CenterStart)
+            ) {
+                GlassChromeBar(
+                    hazeState = chromeHazeState,
+                    shape = RoundedCornerShape(50),
+                    modifier = Modifier.height(LuminaGlassMetrics.TopControlSize)
+                ) {
+                    Text(
+                        text = "Lumina",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = colors.textPrimary,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 11.dp)
+                    )
+                }
+            }
+
+            GlassActionPill(
                 hazeState = chromeHazeState,
-                onClick = { onToggleSearch(!uiState.isSearchActive) }
-            )
-            GlassOrbButton(
-                icon = Icons.Rounded.Settings,
-                contentDescription = "Settings",
-                hazeState = chromeHazeState,
-                onClick = onOpenSettings
-            )
+                modifier = Modifier.align(Alignment.CenterEnd)
+            ) {
+                IconButton(
+                    onClick = {
+                        haptics.play(LuminaHaptic.Select)
+                        onToggleSearch(!uiState.isSearchActive)
+                    },
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        imageVector = if (uiState.isSearchActive) Icons.Rounded.Close else Icons.Rounded.Search,
+                        contentDescription = if (uiState.isSearchActive) "Close search" else "Search reminders",
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(
+                    onClick = {
+                        haptics.play(LuminaHaptic.Select)
+                        onOpenSettings()
+                    },
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = "Settings",
+                        tint = colors.textPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -663,7 +878,7 @@ private fun SmartBentoTile(
     title: String,
     count: Int,
     icon: ImageVector,
-    accentColor: Color,
+    medallionColor: Color,
     hazeState: HazeState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -671,7 +886,6 @@ private fun SmartBentoTile(
     val colors = LocalLuminaColors.current
     GlassCard(
         hazeState = hazeState,
-        accentTint = accentColor,
         onClick = onClick,
         modifier = modifier.height(106.dp)
     ) {
@@ -688,17 +902,17 @@ private fun SmartBentoTile(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(38.dp)
                         .clip(CircleShape)
-                        .background(accentColor.copy(alpha = 0.24f))
-                        .border(0.8.dp, accentColor.copy(alpha = 0.6f), CircleShape),
+                        .background(medallionColor.copy(alpha = 0.22f))
+                        .border(0.8.dp, medallionColor.copy(alpha = 0.65f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(19.dp)
+                        tint = medallionColor,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
@@ -706,7 +920,7 @@ private fun SmartBentoTile(
                     text = count.toString(),
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp,
+                        fontSize = 25.sp,
                         fontFeatureSettings = "tnum"
                     ),
                     color = colors.textPrimary

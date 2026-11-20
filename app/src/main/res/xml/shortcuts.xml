@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_add"
+        android:shortcutId="new_reminder"
+        android:shortcutLongLabel="@string/shortcut_new_reminder"
+        android:shortcutShortLabel="@string/shortcut_new_reminder">
+        <intent
+            android:action="com.cancellls.lumina.SHORTCUT_QUICK_ADD"
+            android:targetClass="com.cancellls.lumina.MainActivity"
+            android:targetPackage="com.cancellls.lumina" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_today"
+        android:shortcutId="today_list"
+        android:shortcutLongLabel="@string/shortcut_today"
+        android:shortcutShortLabel="@string/shortcut_today">
+        <intent
+            android:action="com.cancellls.lumina.SHORTCUT_TODAY"
+            android:targetClass="com.cancellls.lumina.MainActivity"
+            android:targetPackage="com.cancellls.lumina" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_scheduled"
+        android:shortcutId="scheduled_list"
+        android:shortcutLongLabel="@string/shortcut_scheduled"
+        android:shortcutShortLabel="@string/shortcut_scheduled">
+        <intent
+            android:action="com.cancellls.lumina.SHORTCUT_SCHEDULED"
+            android:targetClass="com.cancellls.lumina.MainActivity"
+            android:targetPackage="com.cancellls.lumina" />
+    </shortcut>
+</shortcuts>

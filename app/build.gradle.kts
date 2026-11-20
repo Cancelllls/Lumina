@@ -14,11 +14,20 @@ android {
         applicationId = "com.cancellls.lumina"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
 
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            isUniversalApk = true
         }
     }
 
@@ -37,7 +46,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             signingConfig = if (releaseKeystoreFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
@@ -60,6 +70,12 @@ android {
         buildConfig = true
     }
 
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = false
+        disable += setOf("GradleDependency", "AndroidGradlePluginVersion")
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
@@ -75,6 +91,10 @@ kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_21)
     }
+}
+
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

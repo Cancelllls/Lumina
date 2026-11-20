@@ -1,9 +1,11 @@
 package com.cancellls.lumina.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.CheckCircleOutline
+import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -29,6 +32,10 @@ import androidx.compose.material.icons.rounded.OutlinedFlag
 import androidx.compose.material.icons.rounded.PriorityHigh
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Snooze
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -41,6 +48,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,13 +63,15 @@ import com.cancellls.lumina.domain.Priority
 import com.cancellls.lumina.domain.RecurrenceEngine
 import com.cancellls.lumina.domain.ReminderItem
 import com.cancellls.lumina.domain.ReminderListItem
-import com.cancellls.lumina.ui.glass.GlassCard
 import com.cancellls.lumina.ui.glass.GlassChip
 import com.cancellls.lumina.ui.glass.GlassCompletionRing
+import com.cancellls.lumina.ui.glass.luminaGlassSurface
+import com.cancellls.lumina.ui.haptics.LuminaHaptic
+import com.cancellls.lumina.ui.haptics.rememberLuminaHaptics
 import com.cancellls.lumina.ui.theme.LocalLuminaColors
 import dev.chrisbanes.haze.HazeState
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 fun ReminderRow(
     item: ReminderItem,
@@ -70,21 +80,28 @@ fun ReminderRow(
     onToggleComplete: () -> Unit,
     onToggleFlag: () -> Unit,
     onToggleSubtask: (Long) -> Unit,
+    onSnooze: (Int) -> Unit,
+    onDuplicate: () -> Unit,
+    onShare: () -> Unit,
     onDelete: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val colors = LocalLuminaColors.current
+    val haptics = rememberLuminaHaptics()
     var subtasksExpanded by rememberSaveable(item.id) { mutableStateOf(false) }
+    var contextMenuOpen by remember { mutableStateOf(false) }
 
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = { value ->
             when (value) {
                 SwipeToDismissBoxValue.StartToEnd -> {
+                    haptics.play(LuminaHaptic.Confirm)
                     onToggleComplete()
                     false
                 }
                 SwipeToDismissBoxValue.EndToStart -> {
+                    haptics.play(LuminaHaptic.Heavy)
                     onDelete()
                     true
                 }
@@ -147,11 +164,21 @@ fun ReminderRow(
             }
         }
     ) {
-        GlassCard(
-            hazeState = hazeState,
-            shape = RoundedCornerShape(22.dp),
-            onClick = onClick,
-            modifier = Modifier.fillMaxWidth()
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .luminaGlassSurface(
+                    hazeState = hazeState,
+                    shape = RoundedCornerShape(22.dp),
+                    isChrome = false
+                )
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        haptics.play(LuminaHaptic.Heavy)
+                        contextMenuOpen = true
+                    }
+                )
         ) {
             Column(
                 modifier = Modifier
@@ -267,7 +294,10 @@ fun ReminderRow(
                     }
 
                     IconButton(
-                        onClick = onToggleFlag,
+                        onClick = {
+                            haptics.play(LuminaHaptic.Tick)
+                            onToggleFlag()
+                        },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
@@ -286,13 +316,19 @@ fun ReminderRow(
                             .padding(start = 42.dp, top = 8.dp, end = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        HorizontalDivider(color = colors.rimBottomRight)
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = colors.rimBottomRight
+                        )
                         item.subtasks.forEach { sub ->
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .clickable { onToggleSubtask(sub.id) }
+                                    .clickable {
+                                        haptics.play(LuminaHaptic.Tick)
+                                        onToggleSubtask(sub.id)
+                                    }
                                     .padding(vertical = 4.dp, horizontal = 4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -334,6 +370,85 @@ fun ReminderRow(
                         }
                     }
                 }
+            }
+
+            DropdownMenu(
+                expanded = contextMenuOpen,
+                onDismissRequest = { contextMenuOpen = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text(if (item.isCompleted) "Mark Incomplete" else "Complete") },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.CheckCircleOutline, contentDescription = null)
+                    },
+                    onClick = {
+                        contextMenuOpen = false
+                        onToggleComplete()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text(if (item.isFlagged) "Remove Flag" else "Flag") },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Flag, contentDescription = null)
+                    },
+                    onClick = {
+                        contextMenuOpen = false
+                        onToggleFlag()
+                    }
+                )
+                if (!item.isCompleted) {
+                    DropdownMenuItem(
+                        text = { Text("Snooze 15m") },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Snooze, contentDescription = null)
+                        },
+                        onClick = {
+                            contextMenuOpen = false
+                            onSnooze(15)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Snooze 1h") },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Schedule, contentDescription = null)
+                        },
+                        onClick = {
+                            contextMenuOpen = false
+                            onSnooze(60)
+                        }
+                    )
+                }
+                DropdownMenuItem(
+                    text = { Text("Duplicate") },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.ContentCopy, contentDescription = null)
+                    },
+                    onClick = {
+                        contextMenuOpen = false
+                        onDuplicate()
+                    }
+                )
+                DropdownMenuItem(
+                    text = { Text("Share") },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.Share, contentDescription = null)
+                    },
+                    onClick = {
+                        contextMenuOpen = false
+                        onShare()
+                    }
+                )
+                HorizontalDivider(thickness = 0.5.dp)
+                DropdownMenuItem(
+                    text = { Text("Delete", color = colors.danger) },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = colors.danger)
+                    },
+                    onClick = {
+                        contextMenuOpen = false
+                        onDelete()
+                    }
+                )
             }
         }
     }

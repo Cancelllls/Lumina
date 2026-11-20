@@ -42,6 +42,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,10 +51,12 @@ import com.cancellls.lumina.domain.ReminderItem
 import com.cancellls.lumina.domain.SmartListFilter
 import com.cancellls.lumina.domain.SmartListType
 import com.cancellls.lumina.domain.SortOrder
+import com.cancellls.lumina.ui.glass.BottomFadeBlur
 import com.cancellls.lumina.ui.glass.GlassCard
 import com.cancellls.lumina.ui.glass.GlassChromeBar
 import com.cancellls.lumina.ui.glass.GlassOrbButton
 import com.cancellls.lumina.ui.glass.ListIconCatalog
+import com.cancellls.lumina.ui.glass.LuminaGlassMetrics
 import com.cancellls.lumina.ui.glass.TopFadeBlur
 import com.cancellls.lumina.ui.theme.LocalLuminaColors
 import dev.chrisbanes.haze.HazeState
@@ -65,6 +69,7 @@ fun ReminderListScreen(
     uiState: MainUiState,
     meshHazeState: HazeState,
     chromeHazeState: HazeState,
+    nestedScrollConnection: NestedScrollConnection,
     onBack: () -> Unit,
     onSortOrderChange: (SortOrder) -> Unit,
     onToggleShowCompleted: (Boolean) -> Unit,
@@ -72,6 +77,9 @@ fun ReminderListScreen(
     onToggleComplete: (Long) -> Unit,
     onToggleFlag: (Long) -> Unit,
     onToggleSubtask: (Long) -> Unit,
+    onSnooze: (Long, Int) -> Unit,
+    onDuplicate: (ReminderItem) -> Unit,
+    onShare: (ReminderItem) -> Unit,
     onDeleteReminder: (Long) -> Unit,
     onOpenReminder: (ReminderItem) -> Unit,
     modifier: Modifier = Modifier
@@ -145,10 +153,11 @@ fun ReminderListScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .nestedScroll(nestedScrollConnection)
                 .hazeSource(state = chromeHazeState),
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
+                start = LuminaGlassMetrics.PageGutter,
+                end = LuminaGlassMetrics.PageGutter,
                 top = 104.dp,
                 bottom = 148.dp
             ),
@@ -210,6 +219,9 @@ fun ReminderListScreen(
                             onToggleComplete = { onToggleComplete(item.id) },
                             onToggleFlag = { onToggleFlag(item.id) },
                             onToggleSubtask = onToggleSubtask,
+                            onSnooze = { mins -> onSnooze(item.id, mins) },
+                            onDuplicate = { onDuplicate(item) },
+                            onShare = { onShare(item) },
                             onDelete = { onDeleteReminder(item.id) },
                             onClick = { onOpenReminder(item) }
                         )
@@ -235,6 +247,9 @@ fun ReminderListScreen(
                             onToggleComplete = { onToggleComplete(item.id) },
                             onToggleFlag = { onToggleFlag(item.id) },
                             onToggleSubtask = onToggleSubtask,
+                            onSnooze = { mins -> onSnooze(item.id, mins) },
+                            onDuplicate = { onDuplicate(item) },
+                            onShare = { onShare(item) },
                             onDelete = { onDeleteReminder(item.id) },
                             onClick = { onOpenReminder(item) }
                         )
@@ -243,10 +258,14 @@ fun ReminderListScreen(
             }
         }
 
-        // Progressive Apple Scroll-Edge Blur
+        // Progressive Scroll-Edge Blurs
         TopFadeBlur(
             hazeState = chromeHazeState,
             modifier = Modifier.align(Alignment.TopCenter)
+        )
+        BottomFadeBlur(
+            hazeState = chromeHazeState,
+            modifier = Modifier.align(Alignment.BottomCenter)
         )
 
         // BitChord Floating Top Islands (Back Orb + Title Pill + Menu Orb)
@@ -254,7 +273,7 @@ fun ReminderListScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = LuminaGlassMetrics.PageGutter, vertical = 10.dp)
                 .hazeGlassContainer(mergeDistance = 10.dp)
                 .align(Alignment.TopCenter),
             verticalAlignment = Alignment.CenterVertically,
@@ -272,7 +291,7 @@ fun ReminderListScreen(
                 shape = RoundedCornerShape(50),
                 modifier = Modifier
                     .weight(1f)
-                    .height(44.dp)
+                    .height(LuminaGlassMetrics.TopControlSize)
             ) {
                 Row(
                     modifier = Modifier

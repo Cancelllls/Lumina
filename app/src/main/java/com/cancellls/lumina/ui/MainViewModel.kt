@@ -383,6 +383,24 @@ class MainViewModel(
         }
     }
 
+    fun duplicateReminder(item: ReminderItem) {
+        viewModelScope.launch {
+            repository.createReminder(
+                title = "${item.title} (Copy)",
+                notes = item.notes,
+                listId = item.listId,
+                dueAtMillis = item.dueAtMillis,
+                hasTime = item.hasTime,
+                priority = item.priority,
+                isFlagged = item.isFlagged,
+                recurrenceRule = item.recurrenceRule,
+                subtasks = item.subtasks.map { it.copy(id = 0L, isCompleted = false) }
+            )
+            dismissModal()
+            _events.emit(UiEvent.Message("Duplicated \"${item.title}\""))
+        }
+    }
+
     fun toggleFlag(reminderId: Long) {
         viewModelScope.launch {
             repository.toggleFlag(reminderId)

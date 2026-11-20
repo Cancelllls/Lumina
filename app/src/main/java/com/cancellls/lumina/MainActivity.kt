@@ -1,6 +1,7 @@
 package com.cancellls.lumina
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -17,15 +18,22 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -37,12 +45,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cancellls.lumina.alarm.NotificationHelper
+import com.cancellls.lumina.domain.ReminderItem
+import com.cancellls.lumina.domain.SmartListType
 import com.cancellls.lumina.ui.ActiveModal
 import com.cancellls.lumina.ui.HomeScreen
 import com.cancellls.lumina.ui.ListEditorDialog
@@ -53,7 +64,12 @@ import com.cancellls.lumina.ui.ReminderEditorSheet
 import com.cancellls.lumina.ui.ReminderListScreen
 import com.cancellls.lumina.ui.SettingsSheet
 import com.cancellls.lumina.ui.UiEvent
+import com.cancellls.lumina.ui.UiFormatters
 import com.cancellls.lumina.ui.glass.AmbientMeshBackdrop
+import com.cancellls.lumina.ui.glass.GlassChip
+import com.cancellls.lumina.ui.glass.GlassChromeBar
+import com.cancellls.lumina.ui.rememberDockScrollState
+import com.cancellls.lumina.ui.theme.LocalLuminaColors
 import com.cancellls.lumina.ui.theme.LuminaTheme
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -99,6 +115,17 @@ class MainActivity : ComponentActivity() {
 
     private fun handleLaunchIntent(intent: Intent?) {
         if (intent == null) return
+        when (intent.action) {
+            ACTION_SHORTCUT_QUICK_ADD -> {
+                viewModel.setQuickAddExpanded(true)
+            }
+            ACTION_SHORTCUT_TODAY -> {
+                viewModel.openSmartList(SmartListType.TODAY)
+            }
+            ACTION_SHORTCUT_SCHEDULED -> {
+                viewModel.openSmartList(SmartListType.SCHEDULED)
+            }
+        }
         if (intent.getBooleanExtra(NotificationHelper.EXTRA_OPEN_QUICK_ADD, false)) {
             viewModel.setQuickAddExpanded(true)
             intent.removeExtra(NotificationHelper.EXTRA_OPEN_QUICK_ADD)
@@ -127,6 +154,12 @@ class MainActivity : ComponentActivity() {
         }
         startActivity(intent)
     }
+
+    companion object {
+        const val ACTION_SHORTCUT_QUICK_ADD = "com.cancellls.lumina.SHORTCUT_QUICK_ADD"
+        const val ACTION_SHORTCUT_TODAY = "com.cancellls.lumina.SHORTCUT_TODAY"
+        const val ACTION_SHORTCUT_SCHEDULED = "com.cancellls.lumina.SHORTCUT_SCHEDULED"
+    }
 }
 
 @Composable
@@ -140,6 +173,7 @@ private fun LuminaRootHost(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val dockScrollState = rememberDockScrollState()
 
     var resumeTick by remember { mutableIntStateOf(0) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -212,6 +246,10 @@ private fun LuminaRootHost(
         }
     }
 
+    LaunchedEffect(uiState.currentScreen) {
+        dockScrollState.expand()
+    }
+
     LaunchedEffect(Unit) {
         viewModel.events.collect { event ->
             snackbarHostState.currentSnackbarData?.dismiss()
@@ -270,81 +308,100 @@ private fun LuminaRootHost(
             transitionSpec = { fadeIn() togetherWith fadeOut() },
             label = "lumina_screen_transition"
         ) { screen ->
-                when (screen) {
-                    LuminaScreen.Home -> {
-                        HomeScreen(
-                            uiState = uiState,
-                            meshHazeState = meshHazeState,
-                            chromeHazeState = chromeHazeState,
-                            showPermissionBanner = showPermissionBanner,
-                            onGrantPermissionsClick = {
-                                if (!hasNotifications && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                } else if (!canExactAlarms) {
-                                    onRequestExactAlarmSettings()
-                                }
-                            },
-                            onDismissPermissionBanner = viewModel::dismissPermissionBanner,
-                            onToggleSearch = viewModel::toggleSearch,
-                            onSearchQueryChange = viewModel::updateSearchQuery,
-                            onOpenSettings = viewModel::openSettings,
-                            onOpenSmartList = viewModel::openSmartList,
-                            onOpenCustomList = viewModel::openCustomList,
-                            onCreateList = { viewModel.openListEditor(null) },
-                            onEditList = { viewModel.openListEditor(it) },
-                            onDeleteList = viewModel::deleteList,
-                            onToggleComplete = viewModel::toggleComplete,
-                            onToggleFlag = viewModel::toggleFlag,
-                            onToggleSubtask = viewModel::toggleSubtask,
-                            onDeleteReminder = viewModel::deleteReminder,
-                            onOpenReminder = viewModel::openReminderEditor
-                        )
-                    }
-                    is LuminaScreen.SmartList, is LuminaScreen.CustomList -> {
-                        ReminderListScreen(
-                            screen = screen,
-                            uiState = uiState,
-                            meshHazeState = meshHazeState,
-                            chromeHazeState = chromeHazeState,
-                            onBack = viewModel::navigateToHome,
-                            onSortOrderChange = viewModel::setSortOrder,
-                            onToggleShowCompleted = viewModel::setShowCompletedInLists,
-                            onClearCompleted = viewModel::clearCompleted,
-                            onToggleComplete = viewModel::toggleComplete,
-                            onToggleFlag = viewModel::toggleFlag,
-                            onToggleSubtask = viewModel::toggleSubtask,
-                            onDeleteReminder = viewModel::deleteReminder,
-                            onOpenReminder = viewModel::openReminderEditor
-                        )
-                    }
+            when (screen) {
+                LuminaScreen.Home -> {
+                    HomeScreen(
+                        uiState = uiState,
+                        meshHazeState = meshHazeState,
+                        chromeHazeState = chromeHazeState,
+                        nestedScrollConnection = dockScrollState,
+                        showPermissionBanner = showPermissionBanner,
+                        onGrantPermissionsClick = {
+                            if (!hasNotifications && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            } else if (!canExactAlarms) {
+                                onRequestExactAlarmSettings()
+                            }
+                        },
+                        onDismissPermissionBanner = viewModel::dismissPermissionBanner,
+                        onToggleSearch = viewModel::toggleSearch,
+                        onSearchQueryChange = viewModel::updateSearchQuery,
+                        onOpenSettings = viewModel::openSettings,
+                        onOpenSmartList = viewModel::openSmartList,
+                        onOpenCustomList = viewModel::openCustomList,
+                        onCreateList = { viewModel.openListEditor(null) },
+                        onEditList = { viewModel.openListEditor(it) },
+                        onDeleteList = viewModel::deleteList,
+                        onToggleComplete = viewModel::toggleComplete,
+                        onToggleFlag = viewModel::toggleFlag,
+                        onToggleSubtask = viewModel::toggleSubtask,
+                        onSnooze = viewModel::snoozeReminder,
+                        onDuplicate = viewModel::duplicateReminder,
+                        onShare = { item -> shareReminder(context, item) },
+                        onDeleteReminder = viewModel::deleteReminder,
+                        onOpenReminder = viewModel::openReminderEditor
+                    )
+                }
+                is LuminaScreen.SmartList, is LuminaScreen.CustomList -> {
+                    ReminderListScreen(
+                        screen = screen,
+                        uiState = uiState,
+                        meshHazeState = meshHazeState,
+                        chromeHazeState = chromeHazeState,
+                        nestedScrollConnection = dockScrollState,
+                        onBack = viewModel::navigateToHome,
+                        onSortOrderChange = viewModel::setSortOrder,
+                        onToggleShowCompleted = viewModel::setShowCompletedInLists,
+                        onClearCompleted = viewModel::clearCompleted,
+                        onToggleComplete = viewModel::toggleComplete,
+                        onToggleFlag = viewModel::toggleFlag,
+                        onToggleSubtask = viewModel::toggleSubtask,
+                        onSnooze = viewModel::snoozeReminder,
+                        onDuplicate = viewModel::duplicateReminder,
+                        onShare = { item -> shareReminder(context, item) },
+                        onDeleteReminder = viewModel::deleteReminder,
+                        onOpenReminder = viewModel::openReminderEditor
+                    )
                 }
             }
+        }
 
-        // Snackbar positioned cleanly above the Dual-Island Liquid Glass Dock
+        // Floating Liquid Glass Undo/Status Toast Pill
         SnackbarHost(
             hostState = snackbarHostState,
+            snackbar = { data ->
+                GlassToastPill(
+                    data = data,
+                    chromeHazeState = chromeHazeState
+                )
+            },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
                 .imePadding()
-                .padding(bottom = 88.dp, start = 16.dp, end = 16.dp)
+                .padding(bottom = 84.dp, start = 16.dp, end = 16.dp)
         )
 
-        // BitChord iOS 26 Dual-Island Liquid Glass Dock
+        // BitChord iOS 26 Scroll-Collapsing Dual-Island Liquid Glass Dock
         QuickAddDock(
             currentScreen = uiState.currentScreen,
+            isInline = dockScrollState.isInline && !uiState.isQuickAddExpanded,
             isExpanded = uiState.isQuickAddExpanded,
             text = uiState.quickAddText,
             parsed = uiState.quickAddParsed,
             chromeHazeState = chromeHazeState,
             onSelectScreen = { target ->
+                dockScrollState.expand()
                 when (target) {
                     LuminaScreen.Home -> viewModel.navigateToHome()
                     is LuminaScreen.SmartList -> viewModel.openSmartList(target.type)
                     is LuminaScreen.CustomList -> viewModel.openCustomList(target.listId)
                 }
             },
-            onExpandedChange = viewModel::setQuickAddExpanded,
+            onExpandedChange = { expanded ->
+                if (expanded) dockScrollState.expand()
+                viewModel.setQuickAddExpanded(expanded)
+            },
             onTextChange = viewModel::updateQuickAddText,
             onSubmit = viewModel::submitQuickAdd,
             onOpenFullEditor = viewModel::openDetailedCreatorFromQuickAdd,
@@ -360,7 +417,9 @@ private fun LuminaRootHost(
                 onDismiss = viewModel::dismissModal,
                 onSave = viewModel::saveReminder,
                 onDelete = viewModel::deleteReminder,
-                onSnooze = viewModel::snoozeReminder
+                onSnooze = viewModel::snoozeReminder,
+                onDuplicate = viewModel::duplicateReminder,
+                onShare = { item -> shareReminder(context, item) }
             )
         }
         is ActiveModal.ListEditor -> {
@@ -402,4 +461,68 @@ private fun LuminaRootHost(
         }
         null -> Unit
     }
+}
+
+@Composable
+private fun GlassToastPill(
+    data: SnackbarData,
+    chromeHazeState: dev.chrisbanes.haze.HazeState
+) {
+    val colors = LocalLuminaColors.current
+    GlassChromeBar(
+        hazeState = chromeHazeState,
+        shape = RoundedCornerShape(50),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(
+                text = data.visuals.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.textPrimary,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            data.visuals.actionLabel?.let { actionLabel ->
+                GlassChip(
+                    label = actionLabel,
+                    tint = colors.accent,
+                    selected = true,
+                    onClick = { data.performAction() }
+                )
+            }
+        }
+    }
+}
+
+private fun shareReminder(context: Context, item: ReminderItem) {
+    val text = buildString {
+        append(item.title)
+        item.effectiveDueMillis?.let { due ->
+            append("\nDue: ")
+            append(UiFormatters.formatDueChip(due, item.hasTime))
+        }
+        if (item.notes.isNotBlank()) {
+            append("\n")
+            append(item.notes)
+        }
+        if (item.subtasks.isNotEmpty()) {
+            item.subtasks.forEach { sub ->
+                append("\n")
+                append(if (sub.isCompleted) "[x] " else "[ ] ")
+                append(sub.title)
+            }
+        }
+    }
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, text)
+    }
+    context.startActivity(Intent.createChooser(intent, "Share Reminder"))
 }

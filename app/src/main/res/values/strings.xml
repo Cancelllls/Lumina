@@ -5,4 +5,7 @@
     <string name="widget_description">Adaptive frosted glass reminders widget with instant completion and quick add.</string>
     <string name="channel_reminders_name">Reminders</string>
     <string name="channel_reminders_desc">Exact-time notifications and snooze actions for scheduled reminders.</string>
+    <string name="shortcut_new_reminder">New Reminder</string>
+    <string name="shortcut_today">Today</string>
+    <string name="shortcut_scheduled">Scheduled</string>
 </resources>

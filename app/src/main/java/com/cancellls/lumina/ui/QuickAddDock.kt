@@ -12,6 +12,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,20 +55,28 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -79,9 +88,13 @@ import com.cancellls.lumina.domain.SmartListType
 import com.cancellls.lumina.ui.glass.GlassChip
 import com.cancellls.lumina.ui.glass.GlassChromeBar
 import com.cancellls.lumina.ui.glass.GlassOrbButton
+import com.cancellls.lumina.ui.haptics.LuminaHaptic
+import com.cancellls.lumina.ui.haptics.rememberLuminaHaptics
 import com.cancellls.lumina.ui.theme.LocalLuminaColors
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.glass.hazeGlassContainer
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private data class DockTabItem(
     val label: String,
@@ -97,15 +110,51 @@ private val dockTabs = listOf(
 )
 
 /**
+ * Scroll connection mirroring BitChord's FloatingTabBarScrollConnection:
+ * scrolling down smoothly collapses the dock inline; scrolling back up restores it.
+ */
+@Stable
+class DockScrollState : NestedScrollConnection {
+    var isInline by mutableStateOf(false)
+        private set
+
+    private var accumulatedDelta = 0f
+
+    fun expand() {
+        accumulatedDelta = 0f
+        isInline = false
+    }
+
+    override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+        val dy = available.y
+        if (dy < -4f) {
+            accumulatedDelta += dy
+            if (accumulatedDelta < -48f) {
+                isInline = true
+            }
+        } else if (dy > 4f) {
+            accumulatedDelta = 0f
+            isInline = false
+        }
+        return Offset.Zero
+    }
+}
+
+@Composable
+fun rememberDockScrollState(): DockScrollState = remember { DockScrollState() }
+
+/**
  * BitChord-inspired iOS 26 Dual-Island Liquid Glass Dock:
- * - Collapsed: a floating tab pill with a spring-animated travelling glass selection lens
- *   paired with a detached circular Quick-Add orb inside a [hazeGlassContainer].
- * - Expanded: morphs smoothly into the natural-language Quick-Add capsule with live NLP chips.
+ * - Collapsed (scroll inline): compact 50dp glass pill + 50dp orb.
+ * - Expanded (default): 62dp tab pill with horizontal drag + lifted lens selection physics
+ *   paired with detached circular Quick-Add orb inside [hazeGlassContainer].
+ * - Quick-Add mode: morphs smoothly into the NLP capture capsule with live chips.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun QuickAddDock(
     currentScreen: LuminaScreen,
+    isInline: Boolean,
     isExpanded: Boolean,
     text: String,
     parsed: ParsedReminderInput,
@@ -118,7 +167,7 @@ fun QuickAddDock(
     modifier: Modifier = Modifier
 ) {
     val colors = LocalLuminaColors.current
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberLuminaHaptics()
     val focusRequester = remember { FocusRequester() }
 
     val hasDetectedMeta = isExpanded && text.isNotBlank() && (
@@ -133,6 +182,12 @@ fun QuickAddDock(
             runCatching { focusRequester.requestFocus() }
         }
     }
+
+    val dockHeight by animateDpAsState(
+        targetValue = if (isInline) 50.dp else 62.dp,
+        animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+        label = "dock_height"
+    )
 
     Column(
         modifier = modifier
@@ -210,38 +265,99 @@ fun QuickAddDock(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Main Floating Tab Pill with travelling liquid glass selection pill
+                    // Main Floating Tab Pill with horizontal drag & lift selection lens
                     GlassChromeBar(
                         hazeState = chromeHazeState,
                         shape = RoundedCornerShape(50),
                         modifier = Modifier
                             .weight(1f)
-                            .height(60.dp)
+                            .height(dockHeight)
                     ) {
                         val selectedIndex = dockTabs.indexOfFirst { it.screen == currentScreen }
                             .coerceAtLeast(0)
+                        val density = LocalDensity.current
+
+                        var isDragging by remember { mutableStateOf(false) }
+                        var dragPosition by remember { mutableFloatStateOf(selectedIndex.toFloat()) }
+                        var lastTickIndex by remember { mutableIntStateOf(selectedIndex) }
+
+                        LaunchedEffect(selectedIndex) {
+                            if (!isDragging) {
+                                dragPosition = selectedIndex.toFloat()
+                                lastTickIndex = selectedIndex
+                            }
+                        }
 
                         BoxWithConstraints(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(5.dp)
+                                .padding(4.dp)
+                                .pointerInput(dockTabs.size) {
+                                    val tabWidthPx = with(density) { (maxWidth / dockTabs.size).toPx() }
+                                    detectHorizontalDragGestures(
+                                        onDragStart = { offset ->
+                                            isDragging = true
+                                            val pos = (offset.x / tabWidthPx - 0.5f)
+                                                .coerceIn(0f, (dockTabs.size - 1).toFloat())
+                                            dragPosition = pos
+                                            lastTickIndex = pos.roundToInt()
+                                            haptics.play(LuminaHaptic.Select)
+                                        },
+                                        onHorizontalDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragPosition = (dragPosition + dragAmount / tabWidthPx)
+                                                .coerceIn(-0.12f, (dockTabs.size - 1) + 0.12f)
+                                            val hovered = dragPosition.roundToInt()
+                                                .coerceIn(0, dockTabs.lastIndex)
+                                            if (hovered != lastTickIndex) {
+                                                lastTickIndex = hovered
+                                                haptics.play(LuminaHaptic.Tick)
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            isDragging = false
+                                            val target = dragPosition.roundToInt()
+                                                .coerceIn(0, dockTabs.lastIndex)
+                                            dragPosition = target.toFloat()
+                                            haptics.play(LuminaHaptic.Select)
+                                            onSelectScreen(dockTabs[target].screen)
+                                        },
+                                        onDragCancel = {
+                                            isDragging = false
+                                            dragPosition = selectedIndex.toFloat()
+                                        }
+                                    )
+                                }
                         ) {
                             val tabWidth = maxWidth / dockTabs.size
+                            val targetX = if (isDragging) {
+                                tabWidth * dragPosition.coerceIn(0f, (dockTabs.size - 1).toFloat())
+                            } else {
+                                tabWidth * selectedIndex
+                            }
+
                             val indicatorOffset by animateDpAsState(
-                                targetValue = tabWidth * selectedIndex,
-                                animationSpec = spring(
-                                    dampingRatio = 0.72f,
-                                    stiffness = Spring.StiffnessMediumLow
-                                ),
+                                targetValue = targetX,
+                                animationSpec = if (isDragging) {
+                                    spring(stiffness = Spring.StiffnessHigh)
+                                } else {
+                                    spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
+                                },
                                 label = "glass_pill_offset"
                             )
-                            val travelDelta = kotlin.math.abs(
-                                (indicatorOffset - tabWidth * selectedIndex).value
-                            )
+
+                            val travelDelta = abs((indicatorOffset - targetX).value)
+                            val isLifted = isDragging || travelDelta > 4f
+
                             val stretchX by animateFloatAsState(
-                                targetValue = if (travelDelta > 4f) 1.09f else 1f,
+                                targetValue = if (isLifted) 1.08f else 1f,
                                 animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMedium),
-                                label = "glass_pill_stretch"
+                                label = "glass_pill_stretch_x"
+                            )
+                            val liftScaleY by animateFloatAsState(
+                                targetValue = if (isDragging) 1.08f else if (isLifted) 0.96f else 1f,
+                                animationSpec = spring(dampingRatio = 0.65f, stiffness = Spring.StiffnessMedium),
+                                label = "glass_pill_lift_y"
                             )
 
                             // Travelling Selection Lens Pill
@@ -252,15 +368,15 @@ fun QuickAddDock(
                                     .fillMaxHeight()
                                     .graphicsLayer {
                                         scaleX = stretchX
-                                        scaleY = 1f / (1f + (stretchX - 1f) * 0.35f)
+                                        scaleY = liftScaleY
                                     }
                                     .clip(RoundedCornerShape(50))
                                     .background(
-                                        if (colors.isDark) Color(0x2EFFFFFF) else Color(0xCCFFFFFF)
+                                        if (colors.isDark) Color(0x30FFFFFF) else Color(0xD9FFFFFF)
                                     )
                                     .border(
                                         0.8.dp,
-                                        colors.rimTopLeft.copy(alpha = 0.75f),
+                                        colors.rimTopLeft.copy(alpha = if (isLifted) 0.95f else 0.72f),
                                         RoundedCornerShape(50)
                                     )
                             )
@@ -281,7 +397,7 @@ fun QuickAddDock(
                                                 interactionSource = interactionSource,
                                                 indication = null
                                             ) {
-                                                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                haptics.play(LuminaHaptic.Select)
                                                 onSelectScreen(tab.screen)
                                             },
                                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -291,33 +407,35 @@ fun QuickAddDock(
                                             imageVector = tab.icon,
                                             contentDescription = tab.label,
                                             tint = if (isSelected) colors.accent else itemColor,
-                                            modifier = Modifier.size(20.dp)
+                                            modifier = Modifier.size(if (isInline) 22.dp else 19.dp)
                                         )
-                                        Text(
-                                            text = tab.label,
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontSize = 10.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                            ),
-                                            color = if (isSelected) colors.textPrimary else itemColor,
-                                            maxLines = 1
-                                        )
+                                        AnimatedVisibility(visible = !isInline) {
+                                            Text(
+                                                text = tab.label,
+                                                style = MaterialTheme.typography.labelMedium.copy(
+                                                    fontSize = 10.sp,
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                ),
+                                                color = if (isSelected) colors.textPrimary else itemColor,
+                                                maxLines = 1
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Detached Circular Liquid Glass Quick-Add Orb (BitChord style)
+                    // Detached Circular Liquid Glass Quick-Add Orb
                     GlassOrbButton(
                         icon = Icons.Rounded.Add,
                         contentDescription = "Quick add reminder",
                         hazeState = chromeHazeState,
-                        size = 60.dp,
+                        size = dockHeight,
                         tint = Color.White,
                         accentTint = colors.accent,
                         onClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            haptics.play(LuminaHaptic.Select)
                             onExpandedChange(true)
                         }
                     )
@@ -363,7 +481,10 @@ fun QuickAddDock(
                                 ),
                                 cursorBrush = SolidColor(colors.accent),
                                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                                keyboardActions = KeyboardActions(onSend = { onSubmit() }),
+                                keyboardActions = KeyboardActions(onSend = {
+                                    haptics.play(LuminaHaptic.Confirm)
+                                    onSubmit()
+                                }),
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .focusRequester(focusRequester)
@@ -404,7 +525,12 @@ fun QuickAddDock(
                                 )
                                 .border(0.8.dp, Color.White.copy(alpha = 0.48f), CircleShape)
                                 .clickable {
-                                    if (canSend) onSubmit() else onOpenFullEditor()
+                                    if (canSend) {
+                                        haptics.play(LuminaHaptic.Confirm)
+                                        onSubmit()
+                                    } else {
+                                        onOpenFullEditor()
+                                    }
                                 },
                             contentAlignment = Alignment.Center
                         ) {

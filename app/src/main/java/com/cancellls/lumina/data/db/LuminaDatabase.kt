@@ -12,7 +12,7 @@ import androidx.room.RoomDatabase
         SubtaskEntity::class
     ],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class LuminaDatabase : RoomDatabase() {
 

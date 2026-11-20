@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -53,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -60,11 +62,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.cancellls.lumina.domain.GlassMode
+import com.cancellls.lumina.ui.haptics.LuminaHaptic
+import com.cancellls.lumina.ui.haptics.rememberLuminaHaptics
 import com.cancellls.lumina.ui.theme.LocalGlassMode
 import com.cancellls.lumina.ui.theme.LocalLuminaColors
 import dev.chrisbanes.haze.HazeInput
@@ -77,6 +79,12 @@ import dev.chrisbanes.haze.glass.GlassStyle
 import dev.chrisbanes.haze.glass.hazeGlass
 import kotlin.math.cos
 import kotlin.math.sin
+
+object LuminaGlassMetrics {
+    val TopBarContentHeight = 52.dp
+    val TopControlSize = 44.dp
+    val PageGutter = 16.dp
+}
 
 object ListIconCatalog {
     val iconKeys: List<String> = listOf(
@@ -177,7 +185,7 @@ fun AmbientMeshBackdrop(modifier: Modifier = Modifier) {
     }
 }
 
-private val FootFadeBrush = Brush.verticalGradient(
+private val TopFootFadeBrush = Brush.verticalGradient(
     colorStops = Array(9) { i ->
         val t = i / 8f
         val at = 0.58f + 0.42f * t
@@ -185,15 +193,23 @@ private val FootFadeBrush = Brush.verticalGradient(
     }
 )
 
+private val BottomHeadFadeBrush = Brush.verticalGradient(
+    colorStops = Array(9) { i ->
+        val t = i / 8f
+        val at = 0.42f * t
+        at to Color.Black.copy(alpha = EaseInOut.transform(t))
+    }
+)
+
 /**
  * BitChord-inspired progressive Apple scroll-edge blur under the status bar
- * and floating top controls. Eases cleanly to zero blur with no hard edge.
+ * and floating top controls.
  */
 @Composable
 fun TopFadeBlur(
     hazeState: HazeState,
     modifier: Modifier = Modifier,
-    height: Dp = 84.dp
+    height: Dp = 76.dp
 ) {
     val glassMode = LocalGlassMode.current
     if (glassMode == GlassMode.REDUCED_BLUR) return
@@ -218,7 +234,49 @@ fun TopFadeBlur(
             .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
             .drawWithContent {
                 drawContent()
-                drawRect(FootFadeBrush, blendMode = BlendMode.DstIn)
+                drawRect(TopFootFadeBrush, blendMode = BlendMode.DstIn)
+            }
+            .hazeBlur(
+                input = HazeInput.Sources(hazeState),
+                style = progressiveStyle
+            )
+    )
+}
+
+/**
+ * Bottom scroll-edge progressive blur so scrolling rows glide softly behind
+ * the floating Dual-Island Liquid Glass Dock.
+ */
+@Composable
+fun BottomFadeBlur(
+    hazeState: HazeState,
+    modifier: Modifier = Modifier,
+    height: Dp = 84.dp
+) {
+    val glassMode = LocalGlassMode.current
+    if (glassMode == GlassMode.REDUCED_BLUR) return
+
+    val progressiveStyle = remember {
+        HazeBlurStyle {
+            blurRadius(22.dp)
+            progressive(
+                HazeProgressive.verticalGradient(
+                    startIntensity = 0f,
+                    endIntensity = 1f
+                )
+            )
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .height(height)
+            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+            .drawWithContent {
+                drawContent()
+                drawRect(BottomHeadFadeBrush, blendMode = BlendMode.DstIn)
             }
             .hazeBlur(
                 input = HazeInput.Sources(hazeState),
@@ -238,7 +296,7 @@ fun Modifier.luminaGlassSurface(
     val glassMode = LocalGlassMode.current
 
     val effectiveTint = when {
-        accentTint != null -> accentTint.copy(alpha = if (colors.isDark) 0.16f else 0.14f)
+        accentTint != null -> accentTint.copy(alpha = if (colors.isDark) 0.22f else 0.16f)
         isChrome -> colors.chromeTint
         else -> colors.glassTint
     }
@@ -247,15 +305,27 @@ fun Modifier.luminaGlassSurface(
         colors = listOf(colors.rimTopLeft, colors.rimBottomRight)
     )
 
+    val elevationMod = if (isChrome) {
+        Modifier.shadow(
+            elevation = if (colors.isDark) 12.dp else 8.dp,
+            shape = shape,
+            ambientColor = Color.Black.copy(alpha = 0.35f),
+            spotColor = Color.Black.copy(alpha = 0.35f)
+        )
+    } else {
+        Modifier
+    }
+
     val supportsRenderEffect = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     return when {
         glassMode == GlassMode.REDUCED_BLUR -> {
             this
+                .then(elevationMod)
                 .clip(shape)
                 .background(
                     if (accentTint != null) {
-                        accentTint.copy(alpha = if (colors.isDark) 0.18f else 0.14f)
+                        accentTint.copy(alpha = if (colors.isDark) 0.20f else 0.15f)
                     } else {
                         colors.solidSurface
                     }
@@ -270,6 +340,7 @@ fun Modifier.luminaGlassSurface(
                 }
             }
             this
+                .then(elevationMod)
                 .clip(shape)
                 .hazeGlass(
                     input = HazeInput.Sources(hazeState),
@@ -287,6 +358,7 @@ fun Modifier.luminaGlassSurface(
         else -> {
             val frostStyle = if (isChrome) HazeMaterials.regular() else HazeMaterials.thin()
             this
+                .then(elevationMod)
                 .clip(shape)
                 .hazeBlur(
                     input = HazeInput.Sources(hazeState),
@@ -355,11 +427,12 @@ fun GlassOrbButton(
     hazeState: HazeState,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 44.dp,
+    size: Dp = LuminaGlassMetrics.TopControlSize,
     tint: Color? = null,
     accentTint: Color? = null
 ) {
     val colors = LocalLuminaColors.current
+    val haptics = rememberLuminaHaptics()
     Box(
         modifier = modifier
             .size(size)
@@ -369,7 +442,10 @@ fun GlassOrbButton(
                 accentTint = accentTint,
                 isChrome = true
             )
-            .clickable(onClick = onClick),
+            .clickable {
+                haptics.play(LuminaHaptic.Select)
+                onClick()
+            },
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -378,6 +454,30 @@ fun GlassOrbButton(
             tint = tint ?: colors.textPrimary,
             modifier = Modifier.size(20.dp)
         )
+    }
+}
+
+/**
+ * BitChord's signature grouped 44dp floating multi-action pill.
+ */
+@Composable
+fun GlassActionPill(
+    hazeState: HazeState,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    GlassChromeBar(
+        hazeState = hazeState,
+        shape = RoundedCornerShape(50),
+        modifier = modifier.height(LuminaGlassMetrics.TopControlSize)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            content()
+        }
     }
 }
 
@@ -391,15 +491,16 @@ fun GlassChip(
     onClick: (() -> Unit)? = null
 ) {
     val colors = LocalLuminaColors.current
+    val haptics = rememberLuminaHaptics()
     val activeColor = tint ?: colors.accent
     val bgColor = when {
-        selected -> activeColor.copy(alpha = if (colors.isDark) 0.28f else 0.18f)
+        selected -> activeColor.copy(alpha = if (colors.isDark) 0.26f else 0.16f)
         colors.isDark -> Color(0x1EFFFFFF)
         else -> Color(0x99FFFFFF)
     }
     val borderColor = when {
-        selected -> activeColor.copy(alpha = 0.72f)
-        colors.isDark -> Color(0x26FFFFFF)
+        selected -> activeColor.copy(alpha = 0.68f)
+        colors.isDark -> Color(0x24FFFFFF)
         else -> colors.subtleOuterBorder
     }
     val contentColor = if (selected) activeColor else (tint ?: colors.textSecondary)
@@ -409,7 +510,16 @@ fun GlassChip(
             .clip(RoundedCornerShape(50))
             .background(bgColor)
             .border(0.8.dp, borderColor, RoundedCornerShape(50))
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable {
+                        haptics.play(LuminaHaptic.Tick)
+                        onClick()
+                    }
+                } else {
+                    Modifier
+                }
+            )
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(5.dp)
@@ -439,14 +549,14 @@ fun GlassCompletionRing(
     modifier: Modifier = Modifier,
     size: Dp = 24.dp
 ) {
-    val haptics = LocalHapticFeedback.current
+    val haptics = rememberLuminaHaptics()
     val fillAlpha by animateFloatAsState(
         targetValue = if (isCompleted) 1f else 0f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
         label = "ring_fill"
     )
     val scale by animateFloatAsState(
-        targetValue = if (isCompleted) 1.08f else 1f,
+        targetValue = if (isCompleted) 1.10f else 1f,
         animationSpec = spring(
             dampingRatio = Spring.DampingRatioMediumBouncy,
             stiffness = Spring.StiffnessMedium
@@ -454,7 +564,7 @@ fun GlassCompletionRing(
         label = "ring_scale"
     )
     val animatedBorder by animateColorAsState(
-        targetValue = if (isCompleted) ringColor else ringColor.copy(alpha = 0.75f),
+        targetValue = if (isCompleted) ringColor else ringColor.copy(alpha = 0.78f),
         label = "ring_border"
     )
 
@@ -463,7 +573,7 @@ fun GlassCompletionRing(
             .size(size + 12.dp)
             .clip(CircleShape)
             .clickable {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                haptics.play(LuminaHaptic.Confirm)
                 onToggle()
             },
         contentAlignment = Alignment.Center
