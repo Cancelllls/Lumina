@@ -22,10 +22,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: 'temurin'
           cache: gradle
 
@@ -61,15 +61,15 @@ jobs:
         run: |
           mkdir -p release_assets
           if [ -f app/build/outputs/apk/release/app-release.apk ]; then
-            cp app/build/outputs/apk/release/app-release.apk release_assets/Lumina-v1.0.0-release.apk
+            cp app/build/outputs/apk/release/app-release.apk release_assets/Lumina-v1.1.0-release.apk
             cp app/build/outputs/apk/release/app-release.apk release_assets/Lumina-release.apk
           elif [ -f app/build/outputs/apk/release/app-release-unsigned.apk ]; then
-            cp app/build/outputs/apk/release/app-release-unsigned.apk release_assets/Lumina-v1.0.0-release.apk
+            cp app/build/outputs/apk/release/app-release-unsigned.apk release_assets/Lumina-v1.1.0-release.apk
             cp app/build/outputs/apk/release/app-release-unsigned.apk release_assets/Lumina-release.apk
           fi
 
           if [ -f app/build/outputs/apk/debug/app-debug.apk ]; then
-            cp app/build/outputs/apk/debug/app-debug.apk release_assets/Lumina-v1.0.0-debug.apk
+            cp app/build/outputs/apk/debug/app-debug.apk release_assets/Lumina-v1.1.0-debug.apk
             cp app/build/outputs/apk/debug/app-debug.apk release_assets/Lumina-debug.apk
           fi
           ls -lh release_assets/
@@ -93,22 +93,20 @@ jobs:
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main'
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.0.0' }}
-          name: "Lumina ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.0.0' }}"
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.1.0' }}
+          name: "Lumina ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.1.0' }}"
           draft: false
           prerelease: false
           body: |
-            ## Lumina v1.0.0 — Adaptive Liquid Glass Reminders
+            ## Lumina v1.1.0 — BitChord Liquid Glass & Modern Android Stack
 
-            100% local-first, FOSS (GPL-3.0) Android reminders app built with Jetpack Compose, live Haze backdrop blur, Room persistence, exact alarms, and a frosted home screen widget.
+            Upgraded to **JDK 21 LTS**, **Gradle 9.1.0**, **AGP 9.0.1**, **Kotlin 2.4.21**, **Compose BOM 2026.11.01**, **Room 2.8.5**, and **Haze 2.1.0 (`haze-glass` + `haze-blur`)**, featuring a BitChord-inspired iOS 26 Liquid Glass UI overhaul.
 
-            ### Highlights
-            - **Adaptive Liquid Glass UI**: Dark Obsidian & Light Crystal frosted surfaces with specular rims, live backdrop blur (`dev.chrisbanes.haze`), and 4 ambient mesh palettes.
-            - **Smart Lists & Custom Lists**: Today, Scheduled, Flagged, All, Completed, plus customizable color/icon lists.
-            - **Natural-Language Quick-Add**: Live parsing for dates, times, priorities (`!`, `!!`, `!!!`), flags (`#flag`), and recurrence (`daily`, `every weekday`, `every 3 days`).
-            - **Exact Alarms & Actionable Alerts**: `AlarmManager` scheduling with `Done`, `Snooze 15m`, and `Snooze 1h` notification actions plus reboot rescheduling.
-            - **Frosted Home Widget**: Resizable 4x2 DayNight glass widget with 1-tap completion and quick add.
-            - **Offline Backup**: Schema-versioned JSON export and import via Android Storage Access Framework.
+            ### What's New
+            - **BitChord Liquid Glass Engine**: Real optical `haze-glass` refraction surfaces, specular rim highlights, `hazeGlassContainer` organic pill merging, and progressive Apple-style `TopFadeBlur` scroll-edge frosting.
+            - **Dual-Island Floating Pill Dock**: Spring-physics travelling selection pill for Home / Today / Scheduled / All tabs paired with a detached circular Quick-Add orb that morphs smoothly into the NLP capture capsule.
+            - **Glass Fidelity Controls**: Switch between *Liquid Glass*, *Lighter Frost*, and *Reduced Blur* directly in Settings.
+            - **OLED Obsidian & Crystal Light**: High-contrast monochrome bases paired with animated ambient mesh vibrancy and Apple-tuned tight display typography.
           files: release_assets/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

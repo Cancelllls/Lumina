@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.cancellls.lumina.BuildConfig
 import com.cancellls.lumina.data.AppSettings
+import com.cancellls.lumina.domain.GlassMode
 import com.cancellls.lumina.domain.GlassPalette
 import com.cancellls.lumina.domain.ThemeMode
 import com.cancellls.lumina.ui.glass.GlassChip
@@ -57,6 +58,7 @@ fun SettingsSheet(
     canScheduleExactAlarms: Boolean,
     onDismiss: () -> Unit,
     onThemeModeChange: (ThemeMode) -> Unit,
+    onGlassModeChange: (GlassMode) -> Unit,
     onPaletteChange: (GlassPalette) -> Unit,
     onDefaultSnoozeChange: (Int) -> Unit,
     onOpenNotificationSettings: () -> Unit,
@@ -115,6 +117,24 @@ fun SettingsSheet(
                         label = mode.label,
                         selected = settings.themeMode == mode,
                         onClick = { onThemeModeChange(mode) }
+                    )
+                }
+            }
+
+            Text(
+                text = "Glass Fidelity (BitChord Engine)",
+                style = MaterialTheme.typography.labelLarge,
+                color = colors.textSecondary
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                GlassMode.entries.forEach { mode ->
+                    GlassChip(
+                        label = mode.label,
+                        selected = settings.glassMode == mode,
+                        onClick = { onGlassModeChange(mode) }
                     )
                 }
             }

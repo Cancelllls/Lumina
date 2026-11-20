@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -50,10 +51,13 @@ import com.cancellls.lumina.domain.SmartListType
 import com.cancellls.lumina.domain.SortOrder
 import com.cancellls.lumina.ui.glass.GlassCard
 import com.cancellls.lumina.ui.glass.GlassChromeBar
-import com.cancellls.lumina.ui.glass.GlassIconButton
+import com.cancellls.lumina.ui.glass.GlassOrbButton
 import com.cancellls.lumina.ui.glass.ListIconCatalog
+import com.cancellls.lumina.ui.glass.TopFadeBlur
 import com.cancellls.lumina.ui.theme.LocalLuminaColors
 import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.glass.hazeGlassContainer
+import dev.chrisbanes.haze.hazeSource
 
 @Composable
 fun ReminderListScreen(
@@ -99,8 +103,8 @@ fun ReminderListScreen(
     val screenAccent = when (screen) {
         is LuminaScreen.SmartList -> when (screen.type) {
             SmartListType.TODAY -> Color(0xFF38BDF8)
-            SmartListType.SCHEDULED -> Color(0xFFFB7185)
-            SmartListType.FLAGGED -> Color(0xFFF59E0B)
+            SmartListType.SCHEDULED -> Color(0xFFFA2D48)
+            SmartListType.FLAGGED -> Color(0xFFFF9F0A)
             SmartListType.ALL -> colors.accent
             SmartListType.COMPLETED -> colors.success
         }
@@ -139,11 +143,13 @@ fun ReminderListScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .hazeSource(state = chromeHazeState),
             contentPadding = PaddingValues(
                 start = 16.dp,
                 end = 16.dp,
-                top = 116.dp,
+                top = 104.dp,
                 bottom = 148.dp
             ),
             verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -178,7 +184,7 @@ fun ReminderListScreen(
                                 text = if (isCompletedScreen) {
                                     "Completed reminders appear here so you can review or undo them."
                                 } else {
-                                    "Use the quick-add capsule below to capture a reminder."
+                                    "Tap the + orb below to capture a reminder."
                                 },
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = colors.textSecondary
@@ -237,114 +243,128 @@ fun ReminderListScreen(
             }
         }
 
-        // Floating Frosted Top Chrome Bar
-        GlassChromeBar(
+        // Progressive Apple Scroll-Edge Blur
+        TopFadeBlur(
             hazeState = chromeHazeState,
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
+
+        // BitChord Floating Top Islands (Back Orb + Title Pill + Menu Orb)
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 10.dp)
-                .align(Alignment.TopCenter)
+                .hazeGlassContainer(mergeDistance = 10.dp)
+                .align(Alignment.TopCenter),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Row(
+            GlassOrbButton(
+                icon = Icons.AutoMirrored.Rounded.ArrowBack,
+                contentDescription = "Back",
+                hazeState = chromeHazeState,
+                onClick = onBack
+            )
+
+            GlassChromeBar(
+                hazeState = chromeHazeState,
+                shape = RoundedCornerShape(50),
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .weight(1f)
+                    .height(44.dp)
             ) {
-                GlassIconButton(
-                    icon = Icons.AutoMirrored.Rounded.ArrowBack,
-                    contentDescription = "Back",
-                    onClick = onBack
-                )
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Box(
+                Row(
                     modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(screenAccent.copy(alpha = 0.22f))
-                        .border(1.dp, screenAccent.copy(alpha = 0.6f), CircleShape),
-                    contentAlignment = Alignment.Center
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = screenIcon,
-                        contentDescription = null,
-                        tint = screenAccent,
-                        modifier = Modifier.size(17.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(screenAccent.copy(alpha = 0.22f))
+                            .border(0.8.dp, screenAccent.copy(alpha = 0.6f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = screenIcon,
+                            contentDescription = null,
+                            tint = screenAccent,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Text(
+                        text = screenTitle,
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+
+                    Text(
+                        text = items.size.toString(),
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontFeatureSettings = "tnum"
+                        ),
+                        color = colors.textSecondary
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Text(
-                    text = screenTitle,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = colors.textPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
+            Box {
+                GlassOrbButton(
+                    icon = Icons.Rounded.MoreVert,
+                    contentDescription = "List menu",
+                    hazeState = chromeHazeState,
+                    onClick = { menuExpanded = true }
                 )
 
-                Text(
-                    text = items.size.toString(),
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontFeatureSettings = "tnum"
-                    ),
-                    color = colors.textSecondary,
-                    modifier = Modifier.padding(end = 6.dp)
-                )
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    SortOrder.entries.forEach { order ->
+                        val selected = uiState.settings.sortOrder == order
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    text = if (selected) "Sort: ${order.label} ✓" else "Sort: ${order.label}"
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onSortOrderChange(order)
+                            }
+                        )
+                    }
 
-                Box {
-                    GlassIconButton(
-                        icon = Icons.Rounded.MoreVert,
-                        contentDescription = "List menu",
-                        onClick = { menuExpanded = true }
-                    )
+                    if (screen is LuminaScreen.CustomList) {
+                        val showCompleted = uiState.settings.showCompletedInLists
+                        DropdownMenuItem(
+                            text = {
+                                Text(if (showCompleted) "Hide Completed" else "Show Completed")
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onToggleShowCompleted(!showCompleted)
+                            }
+                        )
+                    }
 
-                    DropdownMenu(
-                        expanded = menuExpanded,
-                        onDismissRequest = { menuExpanded = false }
-                    ) {
-                        SortOrder.entries.forEach { order ->
-                            val selected = uiState.settings.sortOrder == order
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        text = if (selected) "Sort: ${order.label} ✓" else "Sort: ${order.label}"
-                                    )
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    onSortOrderChange(order)
-                                }
-                            )
-                        }
-
-                        if (screen is LuminaScreen.CustomList) {
-                            val showCompleted = uiState.settings.showCompletedInLists
-                            DropdownMenuItem(
-                                text = {
-                                    Text(if (showCompleted) "Hide Completed" else "Show Completed")
-                                },
-                                onClick = {
-                                    menuExpanded = false
-                                    onToggleShowCompleted(!showCompleted)
-                                }
-                            )
-                        }
-
-                        if (isCompletedScreen && items.isNotEmpty()) {
-                            DropdownMenuItem(
-                                text = { Text("Clear Completed", color = colors.danger) },
-                                onClick = {
-                                    menuExpanded = false
-                                    onClearCompleted()
-                                }
-                            )
-                        }
+                    if (isCompletedScreen && items.isNotEmpty()) {
+                        DropdownMenuItem(
+                            text = { Text("Clear Completed", color = colors.danger) },
+                            onClick = {
+                                menuExpanded = false
+                                onClearCompleted()
+                            }
+                        )
                     }
                 }
             }

@@ -21,14 +21,20 @@ enum class SmartListType(val title: String) {
 
 enum class ThemeMode(val label: String) {
     SYSTEM("System"),
-    DARK("Obsidian Dark"),
+    DARK("OLED Dark"),
     LIGHT("Crystal Light")
+}
+
+enum class GlassMode(val label: String) {
+    LIQUID_GLASS("Liquid Glass"),
+    LIGHTER_FROST("Lighter Frost"),
+    REDUCED_BLUR("Reduced Blur")
 }
 
 enum class GlassPalette(val label: String, val primaryHex: Long, val secondaryHex: Long) {
     AURORA_TEAL("Aurora Teal", 0xFF14B8A6, 0xFF38BDF8),
     COBALT_GLASS("Cobalt Glass", 0xFF3B82F6, 0xFF818CF8),
-    AMBER_DUSK("Amber Dusk", 0xFFF59E0B, 0xFFFB7185),
+    AMBER_DUSK("Crimson Dusk", 0xFFFA2D48, 0xFFF59E0B),
     EMERALD_MIST("Emerald Mist", 0xFF10B981, 0xFF2DD4BF)
 }
 

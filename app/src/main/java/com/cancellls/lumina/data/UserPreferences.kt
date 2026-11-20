@@ -2,6 +2,7 @@ package com.cancellls.lumina.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.cancellls.lumina.domain.GlassMode
 import com.cancellls.lumina.domain.GlassPalette
 import com.cancellls.lumina.domain.SortOrder
 import com.cancellls.lumina.domain.ThemeMode
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.update
 
 data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val glassMode: GlassMode = GlassMode.LIQUID_GLASS,
     val palette: GlassPalette = GlassPalette.AURORA_TEAL,
     val defaultSnoozeMinutes: Int = 15,
     val sortOrder: SortOrder = SortOrder.DUE_DATE,
@@ -32,6 +34,9 @@ class UserPreferences(context: Context) {
             themeMode = prefs.getString(KEY_THEME, ThemeMode.SYSTEM.name)
                 ?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() }
                 ?: ThemeMode.SYSTEM,
+            glassMode = prefs.getString(KEY_GLASS_MODE, GlassMode.LIQUID_GLASS.name)
+                ?.let { runCatching { GlassMode.valueOf(it) }.getOrNull() }
+                ?: GlassMode.LIQUID_GLASS,
             palette = prefs.getString(KEY_PALETTE, GlassPalette.AURORA_TEAL.name)
                 ?.let { runCatching { GlassPalette.valueOf(it) }.getOrNull() }
                 ?: GlassPalette.AURORA_TEAL,
@@ -47,6 +52,11 @@ class UserPreferences(context: Context) {
     fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME, mode.name).apply()
         _settings.update { it.copy(themeMode = mode) }
+    }
+
+    fun setGlassMode(mode: GlassMode) {
+        prefs.edit().putString(KEY_GLASS_MODE, mode.name).apply()
+        _settings.update { it.copy(glassMode = mode) }
     }
 
     fun setPalette(palette: GlassPalette) {
@@ -78,6 +88,7 @@ class UserPreferences(context: Context) {
     companion object {
         private const val PREFS_NAME = "lumina_prefs"
         private const val KEY_THEME = "theme_mode"
+        private const val KEY_GLASS_MODE = "glass_mode"
         private const val KEY_PALETTE = "glass_palette"
         private const val KEY_SNOOZE_MINUTES = "default_snooze_minutes"
         private const val KEY_SORT_ORDER = "sort_order"

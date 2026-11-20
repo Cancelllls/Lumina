@@ -1,20 +1,21 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
 }
 
 android {
     namespace = "com.cancellls.lumina"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.cancellls.lumina"
         minSdk = 26
-        targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 36
+        versionCode = 2
+        versionName = "1.1.0"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -50,12 +51,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlinOptions {
-        jvmTarget = "17"
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     buildFeatures {
@@ -74,14 +71,20 @@ android {
     }
 }
 
-dependencies {
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("androidx.activity:activity-compose:1.9.3")
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_21)
+    }
+}
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
+dependencies {
+    implementation("androidx.core:core-ktx:1.16.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
+    implementation("androidx.activity:activity-compose:1.10.1")
+
+    val composeBom = platform("androidx.compose:compose-bom:2026.11.01")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
@@ -89,14 +92,18 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
 
-    implementation("dev.chrisbanes.haze:haze:1.5.4")
+    val hazeVersion = "2.1.0"
+    implementation("dev.chrisbanes.haze:haze:$hazeVersion")
+    implementation("dev.chrisbanes.haze:haze-blur:$hazeVersion")
+    implementation("dev.chrisbanes.haze:haze-blur-materials:$hazeVersion")
+    implementation("dev.chrisbanes.haze:haze-glass:$hazeVersion")
 
-    val roomVersion = "2.6.1"
+    val roomVersion = "2.8.5"
     implementation("androidx.room:room-runtime:$roomVersion")
     implementation("androidx.room:room-ktx:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
 
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 

@@ -43,6 +43,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cancellls.lumina.alarm.NotificationHelper
+import com.cancellls.lumina.domain.SmartListType
 import com.cancellls.lumina.ui.ActiveModal
 import com.cancellls.lumina.ui.HomeScreen
 import com.cancellls.lumina.ui.ListEditorDialog
@@ -55,8 +56,8 @@ import com.cancellls.lumina.ui.SettingsSheet
 import com.cancellls.lumina.ui.UiEvent
 import com.cancellls.lumina.ui.glass.AmbientMeshBackdrop
 import com.cancellls.lumina.ui.theme.LuminaTheme
-import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -79,6 +80,7 @@ class MainActivity : ComponentActivity() {
 
             LuminaTheme(
                 themeMode = uiState.settings.themeMode,
+                glassMode = uiState.settings.glassMode,
                 palette = uiState.settings.palette
             ) {
                 LuminaRootHost(
@@ -99,7 +101,7 @@ class MainActivity : ComponentActivity() {
     private fun handleLaunchIntent(intent: Intent?) {
         if (intent == null) return
         if (intent.getBooleanExtra(NotificationHelper.EXTRA_OPEN_QUICK_ADD, false)) {
-            viewModel.openDetailedCreatorFromQuickAdd()
+            viewModel.setQuickAddExpanded(true)
             intent.removeExtra(NotificationHelper.EXTRA_OPEN_QUICK_ADD)
         }
         val reminderId = intent.getLongExtra(NotificationHelper.EXTRA_REMINDER_ID, -1L)
@@ -245,36 +247,36 @@ private fun LuminaRootHost(
         }
     }
 
-    BackHandler(enabled = uiState.currentScreen != LuminaScreen.Home) {
-        viewModel.navigateToHome()
+    BackHandler(enabled = uiState.isQuickAddExpanded || uiState.currentScreen != LuminaScreen.Home) {
+        if (uiState.isQuickAddExpanded) {
+            viewModel.setQuickAddExpanded(false)
+        } else {
+            viewModel.navigateToHome()
+        }
     }
 
-    val meshHazeState = remember { HazeState() }
-    val chromeHazeState = remember { HazeState() }
+    val meshHazeState = rememberHazeState()
+    val chromeHazeState = rememberHazeState()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Content layer blurred by floating Top Chrome & QuickAddDock
-        Box(
+        AmbientMeshBackdrop(
             modifier = Modifier
                 .fillMaxSize()
+                .hazeSource(state = meshHazeState)
                 .hazeSource(state = chromeHazeState)
-        ) {
-            AmbientMeshBackdrop(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .hazeSource(state = meshHazeState)
-            )
+        )
 
-            AnimatedContent(
-                targetState = uiState.currentScreen,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "lumina_screen_transition"
-            ) { screen ->
+        AnimatedContent(
+            targetState = uiState.currentScreen,
+            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            label = "lumina_screen_transition"
+        ) { screen ->
                 when (screen) {
                     LuminaScreen.Home -> {
                         HomeScreen(
                             uiState = uiState,
                             meshHazeState = meshHazeState,
+                            chromeHazeState = chromeHazeState,
                             showPermissionBanner = showPermissionBanner,
                             onGrantPermissionsClick = {
                                 if (!hasNotifications && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -318,9 +320,8 @@ private fun LuminaRootHost(
                     }
                 }
             }
-        }
 
-        // Snackbar positioned cleanly above QuickAddDock
+        // Snackbar positioned cleanly above the Dual-Island Liquid Glass Dock
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier
@@ -330,11 +331,21 @@ private fun LuminaRootHost(
                 .padding(bottom = 88.dp, start = 16.dp, end = 16.dp)
         )
 
-        // Floating Quick-Add Capsule
+        // BitChord iOS 26 Dual-Island Liquid Glass Dock
         QuickAddDock(
+            currentScreen = uiState.currentScreen,
+            isExpanded = uiState.isQuickAddExpanded,
             text = uiState.quickAddText,
             parsed = uiState.quickAddParsed,
             chromeHazeState = chromeHazeState,
+            onSelectScreen = { target ->
+                when (target) {
+                    LuminaScreen.Home -> viewModel.navigateToHome()
+                    is LuminaScreen.SmartList -> viewModel.openSmartList(target.type)
+                    is LuminaScreen.CustomList -> viewModel.openCustomList(target.listId)
+                }
+            },
+            onExpandedChange = viewModel::setQuickAddExpanded,
             onTextChange = viewModel::updateQuickAddText,
             onSubmit = viewModel::submitQuickAdd,
             onOpenFullEditor = viewModel::openDetailedCreatorFromQuickAdd,
@@ -370,6 +381,7 @@ private fun LuminaRootHost(
                 canScheduleExactAlarms = canExactAlarms,
                 onDismiss = viewModel::dismissModal,
                 onThemeModeChange = viewModel::setThemeMode,
+                onGlassModeChange = viewModel::setGlassMode,
                 onPaletteChange = viewModel::setPalette,
                 onDefaultSnoozeChange = viewModel::setDefaultSnoozeMinutes,
                 onOpenNotificationSettings = {

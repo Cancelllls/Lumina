@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.cancellls.lumina.AppContainer
 import com.cancellls.lumina.data.AppSettings
+import com.cancellls.lumina.domain.GlassMode
 import com.cancellls.lumina.domain.GlassPalette
 import com.cancellls.lumina.domain.NaturalDateParser
 import com.cancellls.lumina.domain.ParsedReminderInput
@@ -75,6 +76,7 @@ data class MainUiState(
     val listActiveCounts: Map<Long, Int> = emptyMap(),
     val searchQuery: String = "",
     val isSearchActive: Boolean = false,
+    val isQuickAddExpanded: Boolean = false,
     val quickAddText: String = "",
     val quickAddParsed: ParsedReminderInput = ParsedReminderInput(cleanTitle = ""),
     val settings: AppSettings = AppSettings(),
@@ -92,6 +94,7 @@ class MainViewModel(
         val screen: LuminaScreen = LuminaScreen.Home,
         val searchQuery: String = "",
         val isSearchActive: Boolean = false,
+        val isQuickAddExpanded: Boolean = false,
         val quickAddText: String = "",
         val activeModal: ActiveModal? = null
     )
@@ -142,6 +145,7 @@ class MainViewModel(
             listActiveCounts = listActiveCounts,
             searchQuery = nav.searchQuery,
             isSearchActive = nav.isSearchActive,
+            isQuickAddExpanded = nav.isQuickAddExpanded,
             quickAddText = nav.quickAddText,
             quickAddParsed = parsed,
             settings = settings,
@@ -170,6 +174,15 @@ class MainViewModel(
             it.copy(
                 isSearchActive = active,
                 searchQuery = if (active) it.searchQuery else ""
+            )
+        }
+    }
+
+    fun setQuickAddExpanded(expanded: Boolean) {
+        navDraft.update {
+            it.copy(
+                isQuickAddExpanded = expanded,
+                quickAddText = if (expanded) it.quickAddText else ""
             )
         }
     }
@@ -210,7 +223,7 @@ class MainViewModel(
                 isFlagged = flagged,
                 recurrenceRule = parsed.recurrenceRule
             )
-            navDraft.update { it.copy(quickAddText = "") }
+            navDraft.update { it.copy(quickAddText = "", isQuickAddExpanded = false) }
         }
     }
 
@@ -225,6 +238,7 @@ class MainViewModel(
         navDraft.update {
             it.copy(
                 quickAddText = "",
+                isQuickAddExpanded = false,
                 activeModal = ActiveModal.ReminderEditor(
                     existing = null,
                     prefillTitle = parsed.cleanTitle,
@@ -411,6 +425,7 @@ class MainViewModel(
     }
 
     fun setThemeMode(mode: ThemeMode) = preferences.setThemeMode(mode)
+    fun setGlassMode(mode: GlassMode) = preferences.setGlassMode(mode)
     fun setPalette(palette: GlassPalette) = preferences.setPalette(palette)
     fun setDefaultSnoozeMinutes(minutes: Int) = preferences.setDefaultSnoozeMinutes(minutes)
     fun setSortOrder(order: SortOrder) = preferences.setSortOrder(order)
