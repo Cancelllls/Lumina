@@ -43,7 +43,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.cancellls.lumina.alarm.NotificationHelper
-import com.cancellls.lumina.domain.SmartListType
 import com.cancellls.lumina.ui.ActiveModal
 import com.cancellls.lumina.ui.HomeScreen
 import com.cancellls.lumina.ui.ListEditorDialog

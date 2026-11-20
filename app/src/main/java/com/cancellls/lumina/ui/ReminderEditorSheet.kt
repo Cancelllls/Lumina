@@ -351,7 +351,7 @@ fun ReminderEditorSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(colors.glassSurfaceTop.copy(alpha = 0.5f))
+                        .background(colors.solidSurface.copy(alpha = 0.65f))
                         .border(1.dp, colors.rimBottomRight, RoundedCornerShape(16.dp))
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -471,7 +471,7 @@ fun ReminderEditorSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
-                            .background(colors.glassSurfaceTop.copy(alpha = 0.45f))
+                            .background(colors.solidSurface.copy(alpha = 0.65f))
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {

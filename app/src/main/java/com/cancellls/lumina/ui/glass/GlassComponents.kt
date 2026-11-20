@@ -58,7 +58,6 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -231,7 +230,7 @@ fun TopFadeBlur(
 @Composable
 fun Modifier.luminaGlassSurface(
     hazeState: HazeState,
-    shape: Shape,
+    shape: RoundedCornerShape,
     accentTint: Color? = null,
     isChrome: Boolean = false
 ): Modifier {
@@ -310,7 +309,7 @@ fun Modifier.luminaGlassSurface(
 fun GlassCard(
     hazeState: HazeState,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(24.dp),
+    shape: RoundedCornerShape = RoundedCornerShape(24.dp),
     accentTint: Color? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
@@ -334,7 +333,7 @@ fun GlassCard(
 fun GlassChromeBar(
     hazeState: HazeState,
     modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(50),
+    shape: RoundedCornerShape = RoundedCornerShape(50),
     accentTint: Color? = null,
     content: @Composable BoxScope.() -> Unit
 ) {

@@ -155,7 +155,7 @@ fun SettingsSheet(
                             .clip(RoundedCornerShape(16.dp))
                             .background(
                                 if (selected) primary.copy(alpha = 0.16f)
-                                else colors.glassSurfaceTop.copy(alpha = 0.45f)
+                                else colors.solidSurface.copy(alpha = 0.65f)
                             )
                             .border(
                                 width = 1.dp,

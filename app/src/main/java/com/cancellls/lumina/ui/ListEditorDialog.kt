@@ -163,7 +163,7 @@ fun ListEditorDialog(
                                 .clip(CircleShape)
                                 .background(
                                     if (isSelected) selectedColor.copy(alpha = 0.25f)
-                                    else colors.glassSurfaceTop.copy(alpha = 0.55f)
+                                    else colors.solidSurface.copy(alpha = 0.7f)
                                 )
                                 .border(
                                     width = 1.dp,
