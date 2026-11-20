@@ -15,7 +15,7 @@
 - **100% Offline & Private**: Zero telemetry, zero analytics, zero Play Services. Local Room SQLite database with schema-versioned JSON backup export/import via Android SAF.
 
 ## Tech Stack
-- **Runtime & Build**: JDK 21 LTS, Gradle `9.1.0`, AGP `9.1.0` (built-in Kotlin, `compileSdk 37`), Kotlin `2.4.21`, KSP `2.3.12`
+- **Runtime & Build**: JDK 21 LTS, Gradle `9.3.1`, AGP `9.1.0` (built-in Kotlin, `compileSdk 37`), Kotlin `2.4.21`, KSP `2.3.12`
 - **UI**: Jetpack Compose (BOM `2026.11.01`), Material 3, Haze `2.1.0` (`haze`, `haze-blur`, `haze-blur-materials`, `haze-glass`)
 - **Storage**: Room `2.8.5`, SharedPreferences
 - **Background**: `AlarmManager`, `BroadcastReceiver`, `AppWidgetProvider`
