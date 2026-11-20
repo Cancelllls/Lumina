@@ -292,44 +292,9 @@ fun QuickAddDock(
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(4.dp)
-                                .pointerInput(dockTabs.size) {
-                                    val tabWidthPx = with(density) { (maxWidth / dockTabs.size).toPx() }
-                                    detectHorizontalDragGestures(
-                                        onDragStart = { offset ->
-                                            isDragging = true
-                                            val pos = (offset.x / tabWidthPx - 0.5f)
-                                                .coerceIn(0f, (dockTabs.size - 1).toFloat())
-                                            dragPosition = pos
-                                            lastTickIndex = pos.roundToInt()
-                                            haptics.play(LuminaHaptic.Select)
-                                        },
-                                        onHorizontalDrag = { change, dragAmount ->
-                                            change.consume()
-                                            dragPosition = (dragPosition + dragAmount / tabWidthPx)
-                                                .coerceIn(-0.12f, (dockTabs.size - 1) + 0.12f)
-                                            val hovered = dragPosition.roundToInt()
-                                                .coerceIn(0, dockTabs.lastIndex)
-                                            if (hovered != lastTickIndex) {
-                                                lastTickIndex = hovered
-                                                haptics.play(LuminaHaptic.Tick)
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            isDragging = false
-                                            val target = dragPosition.roundToInt()
-                                                .coerceIn(0, dockTabs.lastIndex)
-                                            dragPosition = target.toFloat()
-                                            haptics.play(LuminaHaptic.Select)
-                                            onSelectScreen(dockTabs[target].screen)
-                                        },
-                                        onDragCancel = {
-                                            isDragging = false
-                                            dragPosition = selectedIndex.toFloat()
-                                        }
-                                    )
-                                }
                         ) {
                             val tabWidth = maxWidth / dockTabs.size
+                            val tabWidthPx = with(density) { tabWidth.toPx() }
                             val targetX = if (isDragging) {
                                 tabWidth * dragPosition.coerceIn(0f, (dockTabs.size - 1).toFloat())
                             } else {
@@ -360,65 +325,105 @@ fun QuickAddDock(
                                 label = "glass_pill_lift_y"
                             )
 
-                            // Travelling Selection Lens Pill
                             Box(
                                 modifier = Modifier
-                                    .offset(x = indicatorOffset)
-                                    .width(tabWidth)
-                                    .fillMaxHeight()
-                                    .graphicsLayer {
-                                        scaleX = stretchX
-                                        scaleY = liftScaleY
-                                    }
-                                    .clip(RoundedCornerShape(50))
-                                    .background(
-                                        if (colors.isDark) Color(0x30FFFFFF) else Color(0xD9FFFFFF)
-                                    )
-                                    .border(
-                                        0.8.dp,
-                                        colors.rimTopLeft.copy(alpha = if (isLifted) 0.95f else 0.72f),
-                                        RoundedCornerShape(50)
-                                    )
-                            )
-
-                            Row(modifier = Modifier.fillMaxSize()) {
-                                dockTabs.forEachIndexed { idx, tab ->
-                                    val isSelected = idx == selectedIndex &&
-                                        (currentScreen == tab.screen || (idx == 0 && currentScreen !in dockTabs.map { it.screen }))
-                                    val itemColor = if (isSelected) colors.textPrimary else colors.textSecondary
-                                    val interactionSource = remember { MutableInteractionSource() }
-
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .fillMaxHeight()
-                                            .clip(RoundedCornerShape(50))
-                                            .clickable(
-                                                interactionSource = interactionSource,
-                                                indication = null
-                                            ) {
+                                    .fillMaxSize()
+                                    .pointerInput(tabWidthPx) {
+                                        detectHorizontalDragGestures(
+                                            onDragStart = { offset ->
+                                                isDragging = true
+                                                val pos = (offset.x / tabWidthPx - 0.5f)
+                                                    .coerceIn(0f, (dockTabs.size - 1).toFloat())
+                                                dragPosition = pos
+                                                lastTickIndex = pos.roundToInt()
                                                 haptics.play(LuminaHaptic.Select)
-                                                onSelectScreen(tab.screen)
                                             },
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = tab.icon,
-                                            contentDescription = tab.label,
-                                            tint = if (isSelected) colors.accent else itemColor,
-                                            modifier = Modifier.size(if (isInline) 22.dp else 19.dp)
+                                            onHorizontalDrag = { change, dragAmount ->
+                                                change.consume()
+                                                dragPosition = (dragPosition + dragAmount / tabWidthPx)
+                                                    .coerceIn(-0.12f, (dockTabs.size - 1) + 0.12f)
+                                                val hovered = dragPosition.roundToInt()
+                                                    .coerceIn(0, dockTabs.lastIndex)
+                                                if (hovered != lastTickIndex) {
+                                                    lastTickIndex = hovered
+                                                    haptics.play(LuminaHaptic.Tick)
+                                                }
+                                            },
+                                            onDragEnd = {
+                                                isDragging = false
+                                                val target = dragPosition.roundToInt()
+                                                    .coerceIn(0, dockTabs.lastIndex)
+                                                dragPosition = target.toFloat()
+                                                haptics.play(LuminaHaptic.Select)
+                                                onSelectScreen(dockTabs[target].screen)
+                                            },
+                                            onDragCancel = {
+                                                isDragging = false
+                                                dragPosition = selectedIndex.toFloat()
+                                            }
                                         )
-                                        AnimatedVisibility(visible = !isInline) {
-                                            Text(
-                                                text = tab.label,
-                                                style = MaterialTheme.typography.labelMedium.copy(
-                                                    fontSize = 10.sp,
-                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                                                ),
-                                                color = if (isSelected) colors.textPrimary else itemColor,
-                                                maxLines = 1
+                                    }
+                            ) {
+                                // Travelling Selection Lens Pill
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = indicatorOffset)
+                                        .width(tabWidth)
+                                        .fillMaxHeight()
+                                        .graphicsLayer {
+                                            scaleX = stretchX
+                                            scaleY = liftScaleY
+                                        }
+                                        .clip(RoundedCornerShape(50))
+                                        .background(
+                                            if (colors.isDark) Color(0x30FFFFFF) else Color(0xD9FFFFFF)
+                                        )
+                                        .border(
+                                            0.8.dp,
+                                            colors.rimTopLeft.copy(alpha = if (isLifted) 0.95f else 0.72f),
+                                            RoundedCornerShape(50)
+                                        )
+                                )
+
+                                Row(modifier = Modifier.fillMaxSize()) {
+                                    dockTabs.forEachIndexed { idx, tab ->
+                                        val isSelected = idx == selectedIndex &&
+                                            (currentScreen == tab.screen || (idx == 0 && currentScreen !in dockTabs.map { it.screen }))
+                                        val itemColor = if (isSelected) colors.textPrimary else colors.textSecondary
+                                        val interactionSource = remember { MutableInteractionSource() }
+
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(50))
+                                                .clickable(
+                                                    interactionSource = interactionSource,
+                                                    indication = null
+                                                ) {
+                                                    haptics.play(LuminaHaptic.Select)
+                                                    onSelectScreen(tab.screen)
+                                                },
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = tab.icon,
+                                                contentDescription = tab.label,
+                                                tint = if (isSelected) colors.accent else itemColor,
+                                                modifier = Modifier.size(if (isInline) 22.dp else 19.dp)
                                             )
+                                            AnimatedVisibility(visible = !isInline) {
+                                                Text(
+                                                    text = tab.label,
+                                                    style = MaterialTheme.typography.labelMedium.copy(
+                                                        fontSize = 10.sp,
+                                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                                    ),
+                                                    color = if (isSelected) colors.textPrimary else itemColor,
+                                                    maxLines = 1
+                                                )
+                                            }
                                         }
                                     }
                                 }
