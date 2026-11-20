@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "com.cancellls.lumina"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.cancellls.lumina"
