@@ -429,7 +429,7 @@ fun ReminderEditorSheet(
                 }
                 GlassChip(
                     label = if (isFlagged) "Flagged" else "Flag",
-                    icon = if (isFlagged) Icons.Rounded.Flag else Icons.OutlinedFlag,
+                    icon = if (isFlagged) Icons.Rounded.Flag else Icons.Rounded.OutlinedFlag,
                     tint = colors.warning,
                     selected = isFlagged,
                     onClick = { isFlagged = !isFlagged }

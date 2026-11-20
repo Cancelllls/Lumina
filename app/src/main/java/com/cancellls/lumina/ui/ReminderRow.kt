@@ -271,7 +271,7 @@ fun ReminderRow(
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
-                            imageVector = if (item.isFlagged) Icons.Rounded.Flag else Icons.OutlinedFlag,
+                            imageVector = if (item.isFlagged) Icons.Rounded.Flag else Icons.Rounded.OutlinedFlag,
                             contentDescription = "Toggle flag",
                             tint = if (item.isFlagged) colors.warning else colors.textTertiary,
                             modifier = Modifier.size(19.dp)
